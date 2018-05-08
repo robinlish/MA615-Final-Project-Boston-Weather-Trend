@@ -1,0 +1,251 @@
+---
+title: "Final Project: Boston Weather Trend"
+author: "Senhao Li"
+output:
+  rmdformats::readthedown:
+    self_contained: true
+    thumbnails: true
+    lightbox: true
+    gallery: false
+    highlight: tango
+---
+This project tends to explore the weather trend of Boston during the past 82 years, from Jan. 1, 1936 to May 1, 2018. <br/>
+Specifically, we will be seeing the following analysis in this project：<br/>
+- Temperature Gradient of the past 82 years by month for horizontal comparison;<br/>
+- Decomposed Time series of the average temperature during the past 82 years;<br/>
+- Temperature Forecast for the future five years;<br/>
+- Correlations between average temperature and other weather features.<br/>
+ <br/>
+I'll also test the following hypothesis through this project:<br/>
+1. The average temperature is gradually increasing overall;<br/>
+2. The precipitation is positively correlated with the temperature;<br/>
+3. The temperature is negatively correlated with the wind speed;<br/>
+4. The amount of snowfall is negatively correlated with the temperature.<br/>
+
+```{r}
+# install.packages("tidyverse")
+# install.packages(c("RColorBrewer", "dplyr", "dygraphs", "ggfortify"))
+#install.packages("ggfortify")
+#install.packages("rmdformats")
+library(tidyverse)
+library(RColorBrewer)
+library(dplyr)
+library(dygraphs)
+library(ggfortify)
+library(rmdformats)
+```
+
+
+
+## 0. Data Preparation
+The data comes from National Center for Environmental Information: https://www.ncdc.noaa.gov.
+```{r}
+#boston <- read.csv("https://www.ncei.noaa.gov/orders/cdo/1337764.csv")
+#save(boston, file="boston.Rdata")
+
+load("boston.Rdata")
+datetxt <- boston$DATE
+datetxt <- as.Date(datetxt)
+boston <- add_column(boston,
+                     YEAR = as.numeric(format(datetxt, format = "%Y")),
+                     Month = as.numeric(format(datetxt, format = "%m")),
+                     DAY = as.numeric(format(datetxt, format = "%d")), .after = 6) %>% 
+  mutate(MONTH = month.abb[Month])
+boston$month_ordered <- factor(boston$MONTH, levels = month.abb)
+
+boston <- boston[,c("NAME","DATE","YEAR","Month","DAY","PRCP","SNOW","SNWD","TAVG","TMAX","TMIN","MONTH","month_ordered","AWND")]
+```
+
+##1. Temperature Gradients
+####Average Temperature
+```{r}
+ggplot(data=boston, aes(x=YEAR,y=month_ordered)) + 
+  geom_tile(aes(fill = TAVG),colour = "white") + 
+  scale_fill_gradientn(colours=rev(brewer.pal(10,'Spectral')), na.value = "grey98",
+                       limits = c(-20, 100)) + 
+  theme(legend.title=element_blank(), axis.title.y=element_blank(), axis.title.x=element_blank(), plot.title = element_text(hjust = .5)) + 
+  ggtitle("Average Temperature/˚F of Boston from 1936-1-1 to 2018-5-1 (Based on Daily Average)")+
+  scale_x_continuous(breaks=seq(1936,2018,5))
+```
+
+####Max Temperature
+```{r}
+ggplot(data=boston, aes(x=YEAR,y=month_ordered)) + 
+  geom_tile(aes(fill = TMAX),colour = "white") + 
+  scale_fill_gradientn(colours=rev(brewer.pal(10,'Spectral')), na.value = "grey98",
+                       limits = c(-20, 100)) + 
+  theme(legend.title=element_blank(),axis.title.y=element_blank(),axis.title.x=element_blank(),plot.title = element_text(hjust = .5)) + 
+  ggtitle("Maximum Temperature/˚F of Boston from 1936-1-1 to 2018-5-1 (Based on Daily Max)")+
+  scale_x_continuous(breaks=seq(1936,2018,5))
+```
+
+####Min Temperature
+```{r}
+ggplot(data=boston, aes(x=YEAR,y=month_ordered)) + 
+  geom_tile(aes(fill = TMIN),colour = "white") + 
+  scale_fill_gradientn(colours=rev(brewer.pal(10,'Spectral')), na.value = "grey98",
+                       limits = c(-20, 100)) + 
+  theme(legend.title=element_blank(),axis.title.y=element_blank(),axis.title.x=element_blank(),plot.title = element_text(hjust = .5)) + 
+  ggtitle("Minimum Temperature/˚F of Boston from 1936-1-1 to 2018-5-1 (Based on Daily Min)")+
+  scale_x_continuous(breaks=seq(1936,2018,5))
+```
+
+According to the temperature gradient maps above, temperature in June, July and August is obviously higher than other months, while December, January and February generally have the lowest temperature. December, 1962 stands out for its extradinarily low temperature.
+
+####Precipitation
+```{r}
+ggplot(data=boston, aes(x=YEAR,y=month_ordered)) + 
+  geom_tile(aes(fill = PRCP),colour = "white") + 
+  scale_fill_gradientn(colours=brewer.pal(9,'BrBG'), na.value = "grey50",
+                       limits = c(0, 7)) + 
+  theme(legend.title=element_blank(),axis.title.y=element_blank(),axis.title.x=element_blank(),plot.title = element_text(hjust = .5)) + 
+  ggtitle("Pricipitation/inch of Boston from 1936-1-1 to 2018-5-1 (Based on Daily PRCP)")+
+  scale_x_continuous(breaks=seq(1936,2018,5))
+```
+
+As shown above, the overall precipitation in Boston is not too much. There are some months standing out with high precipitation, among which May, 1984 is the top 1 month with highest precipitation.
+
+##2. Time Series
+```{r}
+monthly <- boston %>% select(month_ordered,YEAR,TAVG, PRCP, AWND, SNOW) %>% 
+  group_by(month_ordered,YEAR) %>% 
+  summarise(TAVG = mean(TAVG),PRCP = mean(PRCP), AWND = mean(AWND), SNOW = mean(SNOW)) %>% 
+  arrange(YEAR)
+```
+
+###Average Temperature
+####Overall time series
+```{r}
+myts <- ts(monthly$TAVG,start=c(1936,1), end=c(2018,4), frequency=12)
+ts.decompose <- decompose(myts)
+autoplot(ts.decompose)+ggtitle("Time Sereis of Average Tempetation")
+```
+
+####Observed
+```{r}
+dygraph(ts.decompose$x) %>% dyRangeSelector() %>% dyOptions(drawGrid = F)
+```
+
+####Trend
+```{r}
+dygraph(ts.decompose$trend) %>% dyRangeSelector() %>% dyOptions(drawGrid = F)
+```
+
+####Seasonal
+```{r}
+dygraph(ts.decompose$seasonal) %>% dyRangeSelector() %>% dyOptions(drawGrid = F)
+```
+
+####Random
+```{r}
+dygraph(ts.decompose$random) %>% dyRangeSelector() %>% dyOptions(drawGrid = F)
+```
+
+Although the observed time series shows a seasonal temperature change with regular pattern, the trend time series tells us that the overall temperature of Boston is in a rising trend.
+
+###Precipitation
+```{r}
+ts_prcp <- ts(na.omit(monthly$PRCP),start=c(1936,1), end=c(2018,4), frequency=12)
+autoplot(decompose(ts_prcp))+ggtitle("Time Sereis of Precipitation")
+```
+
+The time series of precipitation demonstrates a less seasonal pattern. But it has several peaks with an interval of 30 years. For instance, the year of 1955 or os has a peak, and around 30 years later, precipitation reached another peak in 1983, which is followed by the next peak in 2010.
+
+##3. Forecast
+```{r}
+hw <- HoltWinters(myts)
+predict_temp <- predict(hw, n.ahead = 24, 
+        prediction.interval = TRUE,
+        level = as.numeric(0.95))
+
+dygraph(predict_temp, main = "Predicted Average Temperature/Month") %>%
+  dySeries(c("lwr", "fit", "upr"), label = "Temperature") %>%
+  dyOptions(drawGrid = F) %>% 
+  dyRangeSelector()
+```
+
+The forecast of the following 24 months follows a regular pattern, with the temperature peaking in July as around 75˚F, and January will be having the lowest temperature 31 ˚F.
+
+##4. Correlation between Temperature and other parameters
+```{r}
+pal <- colorRampPalette(c("blue", "yellow", "red", "green"))
+mycols=pal(12)
+```
+
+###Correlation between Temperature and Precipitation
+```{r}
+ggplot(data=monthly,aes(x=TAVG,y=PRCP,color=factor(month_ordered))) + 
+  geom_point(alpha=.5) + scale_color_manual(values=mycols) + 
+  xlab('Temperature') + ylab('Precipitation')
+
+ggplot(data = monthly,mapping = aes(x=TAVG,y=PRCP)) + geom_point()+
+  geom_smooth(method = "glm", method.args = list(family = "gaussian"))+ 
+  xlab('Temperature') + ylab('Precipitation')
+
+cor.test(monthly$TAVG, monthly$PRCP, use = "complete.obs")
+```
+
+From the above plots, we can come to the conclusion that the temperature is barely correlated to the precipitation of Boston. I also conduct correlation test on these two variables, the result of which shows that the r value is -0.121, a very weak negative relationship between these two variables. The precipitation among the 12 months has no obvious difference.
+
+###Correlation between Wind Speed and Temperature
+```{r}
+ggplot(data=monthly,aes(x=AWND,y=TAVG,color=factor(month_ordered))) + 
+  geom_point(alpha=.5) + scale_color_manual(values=mycols) + 
+  xlab('Wind speed') + ylab('Temprature')
+
+ggplot(data = monthly,mapping = aes(x = AWND, y = TAVG)) + geom_point()+
+  geom_smooth(method = "glm", method.args = list(family = "gaussian")) + 
+  xlab('Wind speed') + ylab('Temprature')
+
+cor.test(monthly$TAVG, monthly$AWND, use = "complete.obs")
+```
+
+The above plots demonstrate that there is a strongly negative correlation between the temperature and wind speed in Boston. As the wind speed increases, the average temperature decreases. Correlation test is conducted on these two variables. the result shows that the r value is -0.625, a strong negative relationship between these two variables. Besides, the second plot shows an obvious difference in terms of the wind speed among different months. High wind speed are likely to concentrate in January and February, while June, July and August have relatively low wind speed.
+
+###Correlation between Snow and Temperature
+```{r}
+ggplot(data=monthly,aes(x=TAVG,y=SNOW,color=factor(month_ordered))) + 
+  geom_point(alpha=.5) + scale_color_manual(values=mycols) + 
+  xlab('Temprature') + ylab('Snow')
+
+ggplot(data = monthly,mapping = aes(x = TAVG, y = SNOW)) + geom_point()+
+  geom_smooth(method = "glm", method.args = list(family = "gaussian"))+ 
+  xlab('Temprature') + ylab('Snow')
+
+
+cor.test(monthly$TAVG, monthly$SNOW, use = "complete.obs")
+```
+
+From the above plots, we can come to the conclusion that the temperature is slightly negatively correlated to the amount of snowfall in Boston. As the temperature goes up, the amount of snowfall decreases. I also conduct correlation test on these two variables, the result of which shows that the r value is -0.215, a weak negative relationship between these two variables. Besides, the second plot shows that the snowfall in Boston concentrates in three months: December, January and February.
+
+##5. Regression
+```{r}
+regression <- lm(data = boston, TAVG ~ AWND)
+regression
+summary(regression)
+
+AIC(regression)
+BIC(regression)
+
+
+regression2 <- lm(data = boston, TAVG ~ AWND + PRCP)
+regression2
+summary(regression2)
+
+AIC(regression2)
+BIC(regression2)
+
+
+regression3 <- lm(data = boston, TAVG ~ AWND + PRCP + SNOW)
+regression3
+summary(regression3)
+
+AIC(regression3)
+BIC(regression3)
+```
+
+The results of regression listed above tell us that all the parameters, namely wind speed, precipitation and snowfall, have a significant impact on the change of temperature in Boston. The limit of this project is that the data is not complete. For the future studies, I would recommend researchers to explore more weather parameters and their influence on the temperature.
+
+
+
+
