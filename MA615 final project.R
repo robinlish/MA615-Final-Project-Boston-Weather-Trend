@@ -1,27 +1,32 @@
-install.packages("dygraphs")
+# install.packages("tidyverse")
+# install.packages(c("RColorBrewer", "dplyr", "dygraphs", "ggfortify"))
+install.packages("ggfortify")
 library(tidyverse)
 library(RColorBrewer)
 library(dplyr)
 library(dygraphs)
-#ncdc <- read.csv("https://www.ncei.noaa.gov/orders/cdo/1336927.csv")
-#ncdc$TAVG <- ceiling((ncdc$TMAX+ncdc$TMIN)/2)
-#save(ncdc, file="ncdc.Rdata")
+library(ggfortify)
+
+# Data Preparation:
 
 #boston <- read.csv("https://www.ncei.noaa.gov/orders/cdo/1337764.csv")
-#boston$TAVG <- ceiling((boston$TMAX+boston$TMIN)/2)
 #save(boston, file="boston.Rdata")
 
 load("boston.Rdata")
-#1. temp map
 datetxt <- boston$DATE
 datetxt <- as.Date(datetxt)
 boston <- add_column(boston,
-                 YEAR = as.numeric(format(datetxt, format = "%Y")),
-                 Month = as.numeric(format(datetxt, format = "%m")),
-                 DAY = as.numeric(format(datetxt, format = "%d")), .after = 6) %>% 
+                     YEAR = as.numeric(format(datetxt, format = "%Y")),
+                     Month = as.numeric(format(datetxt, format = "%m")),
+                     DAY = as.numeric(format(datetxt, format = "%d")), .after = 6) %>% 
   mutate(MONTH = month.abb[Month])
 boston$month_ordered <- factor(boston$MONTH, levels = month.abb)
+
 boston <- boston[,c("NAME","DATE","YEAR","Month","DAY","PRCP","SNOW","SNWD","TAVG","TMAX","TMIN","MONTH","month_ordered","AWND")]
+
+#Data Analysis:
+
+#1. temperature Gradients:
 
 ##average temperature
 ggplot(data=boston, aes(x=YEAR,y=month_ordered)) + 
@@ -50,7 +55,7 @@ ggplot(data=boston, aes(x=YEAR,y=month_ordered)) +
   ggtitle("Minimum Temperature/˚F of Boston from 1936-1-1 to 2018-5-1 (Based on Daily Min)")+
   scale_x_continuous(breaks=seq(1936,2018,5))
 
-##prcp
+##precipitation
 ggplot(data=boston, aes(x=YEAR,y=month_ordered)) + 
   geom_tile(aes(fill = PRCP),colour = "white") + 
   scale_fill_gradientn(colours=brewer.pal(9,'BrBG'), na.value = "grey50",
@@ -69,18 +74,34 @@ monthly <- boston %>% select(month_ordered,YEAR,TAVG, PRCP, AWND, SNOW) %>%
 ##average temp:
 myts <- ts(monthly$TAVG,start=c(1936,1), end=c(2018,4), frequency=12)
 ts.decompose <- decompose(myts)
+autoplot(ts.decompose)+ggtitle("Time Sereis of Average Tempetation")
 
-plot(decompose(myts))
+###observed:
+dygraph(ts.decompose$x) %>% dyRangeSelector() %>% dyOptions(drawGrid = F)
 
-##prcp:
+###trend:
+dygraph(ts.decompose$trend) %>% dyRangeSelector() %>% dyOptions(drawGrid = F)
+
+###seasonal:
+dygraph(ts.decompose$seasonal) %>% dyRangeSelector() %>% dyOptions(drawGrid = F)
+
+###random:
+dygraph(ts.decompose$random) %>% dyRangeSelector() %>% dyOptions(drawGrid = F)
+
+##precipitation:
 ts_prcp <- ts(na.omit(monthly$PRCP),start=c(1936,1), end=c(2018,4), frequency=12)
-autoplot(decompose(ts_prcp))+ggtitle("precipitation")
-View(ts_prcp)
+autoplot(decompose(ts_prcp))+ggtitle("Time Sereis of Precipitation")
 
-#3. forecast
-d.arima <- auto.arima(myts)
-d.forecast <- forecast(d.arima, level = c(95), h = 12)
-autoplot(d.forecast)
+#3. forecast:
+hw <- HoltWinters(myts)
+predict_temp <- predict(hw, n.ahead = 24, 
+        prediction.interval = TRUE,
+        level = as.numeric(0.95))
+
+dygraph(predict_temp, main = "Predicted Average Temperature/Month") %>%
+  dySeries(c("lwr", "fit", "upr"), label = "Temperature") %>%
+  dyOptions(drawGrid = F) %>% 
+  dyRangeSelector()
 
 #4. correlation:
 pal <- colorRampPalette(c("blue", "yellow", "red", "green"))
@@ -92,7 +113,8 @@ ggplot(data=monthly,aes(x=TAVG,y=PRCP,color=factor(month_ordered))) +
   xlab('Temperature') + ylab('Precipitation')
 
 ggplot(data = monthly,mapping = aes(x=TAVG,y=PRCP)) + geom_point()+
-  geom_smooth(method = "glm", method.args = list(family = "gaussian"))
+  geom_smooth(method = "glm", method.args = list(family = "gaussian"))+ 
+  xlab('Temperature') + ylab('Precipitation')
 
 cor.test(monthly$TAVG, monthly$PRCP, use = "complete.obs")
 
@@ -128,7 +150,7 @@ AIC(regression)
 BIC(regression)
 
 
-regression2 <- lm(data = boston, TAVG ~ AWND + PRCP + FMTM)
+regression2 <- lm(data = boston, TAVG ~ AWND + PRCP)
 regression2
 summary(regression2)
 
@@ -143,14 +165,6 @@ summary(regression3)
 AIC(regression3)
 BIC(regression3)
 
-boston$logtemp <- log(boston$TAVG)
-
-regression4 <- lm(data = boston, logtemp ~ AWND + PRCP + FMTM + SNOW)
-regression4
-summary(regression4)
-
-AIC(regression3)
-BIC(regression3)
 
 
 
