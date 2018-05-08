@@ -69,8 +69,8 @@ ui<- dashboardPage(skin = "green",
                                    )),
                        tabItem(tabName = "temperaturegradient",
                                fluidRow(
-                                   box(
-                                   width = 4,
+                                   column( width = 4,
+                                     box(width = NULL,
                                    title = "Select Parameters",
                                    status = "info",
                                    selectInput(
@@ -81,8 +81,15 @@ ui<- dashboardPage(skin = "green",
                                                  "Minimum Temperature" = "boston$TMIN"),
                                      selected = "Average Temperature"
                                    )),
-                                   box(
-                                     width = 8,
+                                   box(width = NULL,
+                                       status = "danger",
+                                       title = "Conclusion",
+                                     "According to the temperature gradient maps above, temperature in June, July and August is obviously higher than other months, 
+                                      while December, January and February generally have the lowest temperature. 
+                                     December, 1962 stands out for its extradinarily low temperature."
+                                   )),
+                                   column(width = 8,
+                                          box(width = NULL,
                                      title = "Temperature Gradient",
                                      status = "primary",
                                      conditionalPanel(condition = "$('html').hasClass('shiny-busy')",
@@ -90,7 +97,7 @@ ui<- dashboardPage(skin = "green",
                                                         img(src = 'https://icons8.com/preloaders/svg-preview.php?preloader_id=25'),
                                                         style = "text-align: center;"
                                                       )),
-                                     plotOutput("grad"))
+                                     plotOutput("grad")))
                                    )),
                        tabItem(tabName = "timeseries",
                                fluidRow(
@@ -128,7 +135,13 @@ ui<- dashboardPage(skin = "green",
                                             dygraphOutput("timeseries4")),
                                    br(),
                                    helpText("Drag to zoom in (double click to zoom back out).")
-                                 )
+                                 ),
+                                
+                                 box(width = 12,
+                                     status = "danger",
+                                     title = "Conclusion of Forecast",
+                                     "Although the observed time series shows a seasonal temperature change with regular pattern, 
+                                     the trend time series tells us that the overall temperature of Boston is in a rising trend.")
                                    )),
                        tabItem(tabName = "forecast",
                                fluidRow(
@@ -156,7 +169,13 @@ ui<- dashboardPage(skin = "green",
                                                         style = "text-align: center;"
                                                       )),
                                    dygraphOutput("dygraph")
-                                 )
+                                 ),
+                                 box(width = 12,
+                                     status = "danger",
+                                     title = "Conclusion of Forecast",
+                                     "The forecast of the following 24 months follows a regular pattern, 
+                                      with the temperature peaking in July as around 75˚F, 
+                                     and January will be having the lowest temperature 31 ˚F.")
                                )
                        ),
                        tabItem(tabName = "prcp_temp",
