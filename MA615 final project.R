@@ -117,6 +117,7 @@ ggplot(data = monthly,mapping = aes(x=TAVG,y=PRCP)) + geom_point()+
   xlab('Temperature') + ylab('Precipitation')
 
 cor.test(monthly$TAVG, monthly$PRCP, use = "complete.obs")
+cor(monthly$TAVG, monthly$PRCP)
 
 ##wind speed vs. temp
 ggplot(data=monthly,aes(x=AWND,y=TAVG,color=factor(month_ordered))) + 
@@ -142,32 +143,46 @@ ggplot(data = monthly,mapping = aes(x = TAVG, y = SNOW)) + geom_point()+
 cor.test(monthly$TAVG, monthly$SNOW, use = "complete.obs")
 
 #5. regression:
-regression <- lm(data = boston, TAVG ~ AWND)
-regression
-summary(regression)
+cor(na.omit(monthly[, c(3:6)]))
+
+scatterplotMatrix(monthly[, c(3:6)], smooth=2,spread=FALSE,main='Scatter Plot Matrix')
+
+#model 1
+lm1 <- lm(data = monthly, TAVG ~ PRCP + AWND + SNOW)
+lm1
+summary(lm1)
+
+par(mfrow=c(2,2))
+plot(lm1)
 
 AIC(regression)
 BIC(regression)
 
+#model 2
+lm2 <- lm(data = monthly, TAVG ~ AWND + SNOW)
+lm2
+summary(lm2)
+plot(lm2)
 
-regression2 <- lm(data = boston, TAVG ~ AWND + PRCP)
-regression2
-summary(regression2)
+AIC(lm2)
+BIC(lm2)
 
-AIC(regression2)
-BIC(regression2)
+#model 3
+lm3 <- lm(data = monthly, TAVG ~ AWND+PRCP)
+lm3
+summary(lm3)
+plot(lm3)
 
+AIC(lm3)
+BIC(lm3)
 
-regression3 <- lm(data = boston, TAVG ~ AWND + PRCP + SNOW)
-regression3
-summary(regression3)
+#model 4
+lm4 <- lm(data = monthly, TAVG ~ AWND)
+lm4
+summary(lm4)
+plot(lm4)
 
-AIC(regression3)
-BIC(regression3)
-
-
-
-
-
+AIC(lm4)
+BIC(lm4)
 
 
